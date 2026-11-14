@@ -390,7 +390,7 @@ func collectCorpus(t *testing.T, fs *vfs.MemFS, name string) {
 			require.NoError(t, fs.MkdirAll(name, os.ModePerm))
 			require.NotNil(t, wc)
 			wc.Start(fs, name)
-			require.NoError(t, d.Checkpoint(fs.PathJoin(name, "checkpoint"), pebble.WithFlushedWAL()))
+			require.NoError(t, d.Checkpoint(fs.PathJoin(name, "checkpoint")))
 			return "started"
 		case "stat":
 			var buf bytes.Buffer

@@ -161,6 +161,7 @@ sync-data: db/000006.log
 
 checkpoint db checkpoints/checkpoint1
 ----
+sync-data: db/000006.log
 mkdir-all: checkpoints/checkpoint1 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -196,9 +197,9 @@ sync: checkpoints/checkpoint1
 close: checkpoints/checkpoint1
 create: checkpoints/checkpoint1/000006.log
 open: db/000006.log (options: *vfs.sequentialReadsOption)
+close: db/000006.log
 sync-data: checkpoints/checkpoint1/000006.log
 close: checkpoints/checkpoint1/000006.log
-close: db/000006.log
 sync: checkpoints/checkpoint1
 close: checkpoints/checkpoint1
 
@@ -209,6 +210,7 @@ checkpoint checkpoints/checkpoint1: file already exists
 # Create a checkpoint that omits SSTs that don't overlap with the [d - f) range.
 checkpoint db checkpoints/checkpoint2 restrict=(d-f)
 ----
+sync-data: db/000006.log
 mkdir-all: checkpoints/checkpoint2 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -240,15 +242,16 @@ sync: checkpoints/checkpoint2
 close: checkpoints/checkpoint2
 create: checkpoints/checkpoint2/000006.log
 open: db/000006.log (options: *vfs.sequentialReadsOption)
+close: db/000006.log
 sync-data: checkpoints/checkpoint2/000006.log
 close: checkpoints/checkpoint2/000006.log
-close: db/000006.log
 sync: checkpoints/checkpoint2
 close: checkpoints/checkpoint2
 
 # Create a checkpoint that omits SSTs that don't overlap with [a - e) and [d - f).
 checkpoint db checkpoints/checkpoint3 restrict=(a-e, d-f)
 ----
+sync-data: db/000006.log
 mkdir-all: checkpoints/checkpoint3 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -281,9 +284,9 @@ sync: checkpoints/checkpoint3
 close: checkpoints/checkpoint3
 create: checkpoints/checkpoint3/000006.log
 open: db/000006.log (options: *vfs.sequentialReadsOption)
+close: db/000006.log
 sync-data: checkpoints/checkpoint3/000006.log
 close: checkpoints/checkpoint3/000006.log
-close: db/000006.log
 sync: checkpoints/checkpoint3
 close: checkpoints/checkpoint3
 
@@ -579,6 +582,7 @@ z z
 # Create a basic checkpoint to see if virtual sstables can be read.
 checkpoint db checkpoints/checkpoint4
 ----
+sync-data: db/000008.log
 mkdir-all: checkpoints/checkpoint4 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -612,9 +616,9 @@ sync: checkpoints/checkpoint4
 close: checkpoints/checkpoint4
 create: checkpoints/checkpoint4/000008.log
 open: db/000008.log (options: *vfs.sequentialReadsOption)
+close: db/000008.log
 sync-data: checkpoints/checkpoint4/000008.log
 close: checkpoints/checkpoint4/000008.log
-close: db/000008.log
 sync: checkpoints/checkpoint4
 close: checkpoints/checkpoint4
 
@@ -690,6 +694,7 @@ marker.manifest.000001.MANIFEST-000001
 # in the checkpoint. See the "link: db/000010.sst" line.
 checkpoint db checkpoints/checkpoint5 restrict=(d-zz)
 ----
+sync-data: db/000008.log
 mkdir-all: checkpoints/checkpoint5 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -723,9 +728,9 @@ sync: checkpoints/checkpoint5
 close: checkpoints/checkpoint5
 create: checkpoints/checkpoint5/000008.log
 open: db/000008.log (options: *vfs.sequentialReadsOption)
+close: db/000008.log
 sync-data: checkpoints/checkpoint5/000008.log
 close: checkpoints/checkpoint5/000008.log
-close: db/000008.log
 sync: checkpoints/checkpoint5
 close: checkpoints/checkpoint5
 
@@ -797,6 +802,7 @@ close checkpoints/checkpoint5
 # There should be a remove backing table entry for backing sstable 10.
 checkpoint db checkpoints/checkpoint6 restrict=(i-zz)
 ----
+sync-data: db/000008.log
 mkdir-all: checkpoints/checkpoint6 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -829,9 +835,9 @@ sync: checkpoints/checkpoint6
 close: checkpoints/checkpoint6
 create: checkpoints/checkpoint6/000008.log
 open: db/000008.log (options: *vfs.sequentialReadsOption)
+close: db/000008.log
 sync-data: checkpoints/checkpoint6/000008.log
 close: checkpoints/checkpoint6/000008.log
-close: db/000008.log
 sync: checkpoints/checkpoint6
 close: checkpoints/checkpoint6
 
@@ -1074,6 +1080,7 @@ sync: valsepdb/MANIFEST-000001
 
 checkpoint valsepdb checkpoints/checkpoint8
 ----
+sync-data: valsepdb/000004.log
 mkdir-all: checkpoints/checkpoint8 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -1191,6 +1198,7 @@ sync: valsepdb/MANIFEST-000001
 
 checkpoint valsepdb checkpoints/checkpoint9 restrict=(a-c)
 ----
+sync-data: valsepdb/000007.log
 mkdir-all: checkpoints/checkpoint9 0755
 open-dir: checkpoints
 sync: checkpoints

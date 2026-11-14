@@ -148,6 +148,7 @@ sync-data: db/000006.log
 
 checkpoint db checkpoints/checkpoint1
 ----
+sync-data: db/000006.log
 mkdir-all: checkpoints/checkpoint1 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -193,9 +194,9 @@ sync: checkpoints/checkpoint1
 close: checkpoints/checkpoint1
 create: checkpoints/checkpoint1/000006.log
 open: db/000006.log (options: *vfs.sequentialReadsOption)
+close: db/000006.log
 sync-data: checkpoints/checkpoint1/000006.log
 close: checkpoints/checkpoint1/000006.log
-close: db/000006.log
 sync: checkpoints/checkpoint1
 close: checkpoints/checkpoint1
 
@@ -206,6 +207,7 @@ checkpoint checkpoints/checkpoint1: file already exists
 # Create a checkpoint that omits SSTs that don't overlap with the [d - f) range.
 checkpoint db checkpoints/checkpoint2 restrict=(d-f)
 ----
+sync-data: db/000006.log
 mkdir-all: checkpoints/checkpoint2 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -248,15 +250,16 @@ sync: checkpoints/checkpoint2
 close: checkpoints/checkpoint2
 create: checkpoints/checkpoint2/000006.log
 open: db/000006.log (options: *vfs.sequentialReadsOption)
+close: db/000006.log
 sync-data: checkpoints/checkpoint2/000006.log
 close: checkpoints/checkpoint2/000006.log
-close: db/000006.log
 sync: checkpoints/checkpoint2
 close: checkpoints/checkpoint2
 
 # Create a checkpoint that omits SSTs that don't overlap with [a - e) and [d - f).
 checkpoint db checkpoints/checkpoint3 restrict=(a-e, d-f)
 ----
+sync-data: db/000006.log
 mkdir-all: checkpoints/checkpoint3 0755
 open-dir: checkpoints
 sync: checkpoints
@@ -299,9 +302,9 @@ sync: checkpoints/checkpoint3
 close: checkpoints/checkpoint3
 create: checkpoints/checkpoint3/000006.log
 open: db/000006.log (options: *vfs.sequentialReadsOption)
+close: db/000006.log
 sync-data: checkpoints/checkpoint3/000006.log
 close: checkpoints/checkpoint3/000006.log
-close: db/000006.log
 sync: checkpoints/checkpoint3
 close: checkpoints/checkpoint3
 

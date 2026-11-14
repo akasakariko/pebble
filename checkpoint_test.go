@@ -14,7 +14,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 
 	"github.com/cockroachdb/crlib/testutils/leaktest"
 	"github.com/cockroachdb/datadriven"
@@ -24,6 +26,7 @@ import (
 	"github.com/cockroachdb/pebble/objstorage/remote"
 	"github.com/cockroachdb/pebble/sstable"
 	"github.com/cockroachdb/pebble/vfs"
+	"github.com/cockroachdb/pebble/vfs/errorfs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -424,6 +427,62 @@ func TestCheckpointFlushWAL(t *testing.T) {
 		require.NoError(t, iter.Close())
 		require.NoError(t, d.Close())
 	}
+}
+
+func TestCheckpointBufferedWAL(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var blockWALWrites atomic.Bool
+		releaseWAL := make(chan struct{})
+		fs := errorfs.Wrap(vfs.NewMem(), errorfs.InjectorFunc(func(op errorfs.Op) error {
+			if blockWALWrites.Load() && op.Kind == errorfs.OpFileWrite &&
+				strings.HasPrefix(op.Path, "db/") && strings.HasSuffix(op.Path, ".log") {
+				<-releaseWAL
+			}
+			return nil
+		}))
+		d, err := Open("db", &Options{
+			FS:                          fs,
+			FormatMajorVersion:          internalFormatNewest,
+			DisableAutomaticCompactions: true,
+			Logger:                      testutils.Logger{T: t},
+		})
+		require.NoError(t, err)
+		defer func() { require.NoError(t, d.Close()) }()
+		unblockWAL := sync.OnceFunc(func() { close(releaseWAL) })
+		defer unblockWAL()
+
+		f, err := fs.Create("ext.sst", vfs.WriteCategoryUnspecified)
+		require.NoError(t, err)
+		w := sstable.NewWriter(objstorageprovider.NewFileWritable(f), d.opts.MakeWriterOptions(0, d.TableFormat()))
+		require.NoError(t, w.Set([]byte("z"), []byte("ingested")))
+		require.NoError(t, w.Close())
+		require.NoError(t, d.Set([]byte("a"), []byte("synced"), Sync))
+
+		// Commit a batch while keeping its WAL record buffered, then ingest a
+		// non-overlapping table directly into the LSM. A consistent checkpoint
+		// must include the batch if it includes the later ingest.
+		blockWALWrites.Store(true)
+		require.NoError(t, d.Set([]byte("k"), []byte("buffered"), NoSync))
+		require.NoError(t, d.Ingest(t.Context(), []string{"ext.sst"}))
+		checkpointDone := make(chan error, 1)
+		go func() { checkpointDone <- d.Checkpoint("checkpoint") }()
+		synctest.Wait()
+		unblockWAL()
+		require.NoError(t, <-checkpointDone)
+
+		checkpoint, err := Open("checkpoint", &Options{FS: fs, ReadOnly: true, Logger: testutils.Logger{T: t}})
+		require.NoError(t, err)
+		defer func() { require.NoError(t, checkpoint.Close()) }()
+		iter, err := checkpoint.NewIter(nil)
+		require.NoError(t, err)
+		defer func() { require.NoError(t, iter.Close()) }()
+		var contents []string
+		for iter.First(); iter.Valid(); iter.Next() {
+			contents = append(contents, fmt.Sprintf("%s=%s", iter.Key(), iter.Value()))
+		}
+		require.NoError(t, iter.Error())
+		require.Equal(t, []string{"a=synced", "k=buffered", "z=ingested"}, contents)
+	})
 }
 
 func TestCheckpointManyFiles(t *testing.T) {

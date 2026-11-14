@@ -22,10 +22,6 @@ import (
 // checkpointOptions hold the optional parameters to construct checkpoint
 // snapshots.
 type checkpointOptions struct {
-	// flushWAL set to true will force a flush and sync of the WAL prior to
-	// checkpointing.
-	flushWAL bool
-
 	// If set, any SSTs that don't overlap with these spans are excluded from a checkpoint.
 	restrictToSpans []CheckpointSpan
 }
@@ -33,19 +29,11 @@ type checkpointOptions struct {
 // CheckpointOption set optional parameters used by `DB.Checkpoint`.
 type CheckpointOption func(*checkpointOptions)
 
-// WithFlushedWAL enables flushing and syncing the WAL prior to constructing a
-// checkpoint. This guarantees that any writes committed before calling
-// DB.Checkpoint will be part of that checkpoint.
+// WithFlushedWAL is a no-op retained for compatibility.
 //
-// Note that this setting can only be useful in cases when some writes are
-// performed with Sync = false. Otherwise, the guarantee will already be met.
-//
-// Passing this option is functionally equivalent to calling
-// DB.LogData(nil, Sync) right before DB.Checkpoint.
+// Deprecated: Checkpoint always flushes and syncs the WAL.
 func WithFlushedWAL() CheckpointOption {
-	return func(opt *checkpointOptions) {
-		opt.flushWAL = true
-	}
+	return func(*checkpointOptions) {}
 }
 
 // WithRestrictToSpans specifies spans of interest for the checkpoint. Any SSTs
@@ -138,6 +126,9 @@ func mkdirAllAndSyncParents(fs vfs.FS, destDir string) (vfs.File, error) {
 // even if hard links are used, the space overhead for the checkpoint will
 // increase over time as the DB performs compactions.
 //
+// When the WAL is enabled, all writes committed before calling Checkpoint are
+// included, even if they were committed with Sync = false.
+//
 // Note that shared files in a checkpoint could get deleted if the DB is
 // restarted after a checkpoint operation, as the reference for the checkpoint
 // is only maintained in memory. This is okay as long as users of Checkpoint
@@ -161,13 +152,6 @@ func (d *DB) Checkpoint(
 			}
 		}
 		return err
-	}
-
-	if opt.flushWAL && !d.opts.DisableWAL {
-		// Write an empty log-data record to flush and sync the WAL.
-		if err := d.LogData(nil /* data */, Sync); err != nil {
-			return err
-		}
 	}
 
 	// Disable file deletions.
@@ -204,11 +188,6 @@ func (d *DB) Checkpoint(
 	}
 	versionBlobFiles := d.mu.versions.latest.blobFiles.Metadatas()
 
-	// Acquire the logs while holding mutexes to ensure we don't race with a
-	// flush that might mark a log that's relevant to `current` as obsolete
-	// before our call to List.
-	allLogicalLogs := d.mu.log.manager.List()
-
 	// Collect SSTable files referenced by flushable ingest entries. These files
 	// are not yet part of the LSM (not in current) but are referenced by WAL
 	// IngestSST records that will be replayed when the checkpoint is opened.
@@ -244,6 +223,21 @@ func (d *DB) Checkpoint(
 	d.mu.versions.logUnlock()
 	d.mu.Unlock()
 	defer current.Unref()
+
+	// Batches below visibleSeqNum may still be buffered in the WAL writer.
+	// Flush them before copying the WAL, so the checkpoint cannot include an
+	// ingest while omitting an earlier batch. The flush must follow the capture
+	// of visibleSeqNum, and must run without the manifest or DB mutex held.
+	if !d.opts.DisableWAL && !d.opts.ReadOnly {
+		if err := d.LogData(nil /* data */, Sync); err != nil {
+			return err
+		}
+	}
+
+	// List the logs after the sync, which may have required WAL failover and
+	// created new segments containing the records we need. File deletions are
+	// disabled, so logs needed by current cannot become obsolete in the meantime.
+	allLogicalLogs := d.mu.log.manager.List()
 
 	// Wrap the normal filesystem with one which wraps newly created files with
 	// vfs.NewSyncingFile.
